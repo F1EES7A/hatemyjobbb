@@ -78,3 +78,57 @@ if user_query:
 # ส่วนท้ายเว็บ
 st.markdown("---")
 st.caption("พัฒนาด้วย Python + Streamlit | ปลอดภัยสำหรับเด็ก วัยเรียนรักส์การค้นคว้า")
+
+import streamlit as st
+import urllib.request
+import json
+import urllib.parse
+
+# 1. ตั้งค่าหน้าตาซอฟต์แวร์ (Frontend)
+st.set_page_config(
+    page_title="AIตัวแม่ที่พร้อมจะช่วยนักเรียนค้นคว้าข้อมูล", 
+    page_icon="🎓", 
+    layout="centered"
+)
+
+st.title("สงสัยอะไรถามได้เลยนะลูก")
+st.write("พิมพ์เรื่องที่สงสัยลงไปได้เลยนะลูก")
+
+# 2. กล่องรับคำถามจากนักเรียน
+user_query = st.text_input("🔍 อยากถามเรื่องอะไรดีลูก?", placeholder="เช่นดวงอาทิตย์, วันสุนทรภู่, ตรีโกณมิติ, กฎของนิวตัน")
+
+# 3. การทำงานของระบบหลังบ้านสารานุกรมความรู้แน่น (Backend)
+if user_query:
+    with st.spinner("⏳ฉันกำลังใช้สมองส่วนกลางค้นคว้าและเรียบเรียงข้อมูลแน่นๆ ให้หนูอยู่จ้า รอแป๊บแม่น้า"):
+        try:
+            # แปลงข้อความภาษาไทยให้เป็นรหัส URL ที่ระบบเข้าใจ
+            encoded_query = urllib.parse.quote(user_query)
+            
+            # ดึงข้อมูลจากคลังวิชาการภาษาไทยโดยตรง ไม่ต้องผ่านเซิร์ฟเวอร์ AI ที่ล่มบ่อย
+            wiki_url = f"https://th.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&exintro=1&explaintext=1&titles={encoded_query}"
+            
+            req = urllib.request.Request(wiki_url, headers={'User-Agent': 'Mozilla/5.0'})
+            
+            with urllib.request.urlopen(req) as response:
+                data = json.loads(response.read().decode('utf-8'))
+                pages = data.get('query', {}).get('pages', {})
+                
+                answer = ""
+                for page_id, page_data in pages.items():
+                    if page_id != "-1": # ถ้าเจอข้อมูล
+                        answer = page_data.get('extract', '')
+                
+                if answer:
+                    st.markdown("---")
+                    st.subheader("📝 ผลการค้นคว้า:")
+                    # แสดงข้อมูลอธิบายอย่างละเอียด หนาแน่น สไตล์ ChatGPT
+                    st.info(f"✨ **สิ่งที่หนูควรรู้เกี่ยวกับ \"{user_query}\" มีดังนี้ค่ะลูก:**\n\n{answer}")
+                else:
+                    st.warning("หาข้อมูลเรื่องนี้ไม่เจอเลยลูก ลองใช้คำค้นหาหลักสั้นๆ ดูนะจ๊ะ (เช่น พิมพ์แค่ 'นิวตัน' แทนคำว่า 'กฎของนิวตัน')")
+                    
+        except Exception as e:
+            st.error("😥 ระบบขัดข้องเล็กน้อย ลองกดพิมพ์ถามใหม่อีกทีนะลูกแม่")
+
+# ส่วนท้ายเว็บ
+st.markdown("---")
+st.caption("พัฒนาด้วย Python + Streamlit | ปลอดภัยสำหรับเด็ก วัยเรียนรักส์การค้นคว้า")
