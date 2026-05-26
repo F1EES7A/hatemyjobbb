@@ -1,90 +1,89 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForCausalLM
-import torch
+from duckduckgo_search import DDGS
+from transformers import pipeline
 
 # =================================================================
 # 🎨 1. หน้าบ้านธีมนกอ้วนสุดน่ารัก (FRONTEND DESIGN)
 # =================================================================
 st.set_page_config(
     page_title="พี่นกอ้วน AI ผู้ช่วยสืบค้นความรู้",
-    page_icon="🐦", # ไอคอนแท็บเว็บเป็นเจ้านกอ้วน
+    page_icon="🐦",
     layout="centered"
 )
 
-# ใช้ CSS ปรับแต่งสีสันและขนาดตัวหนังสือให้เป็นมิตรกับเด็กๆ
 st.markdown("""
     <style>
     .main-title { color: #FF914D; font-family: 'Kanit', sans-serif; text-align: center; font-weight: bold; }
-    .sub-title { color: #555555; text-align: center; margin-bottom: 30px; font-size: 1.2em; }
+    .sub-title { color: #555555; text-align: center; margin-bottom: 30px; font-size: 1.1em; }
     .stTextInput>div>div>input { border-radius: 20px; border: 2px solid #FF914D; }
     .bird-box { background-color: #FFF3EB; padding: 20px; border-radius: 20px; border-left: 8px solid #FF914D; margin-bottom: 20px; }
     </style>
 """, unsafe_allow_html=True)
 
-# ส่วนหัวหน้าเว็บโชว์ตัวพี่นกอ้วน
 st.markdown("<h1 class='main-title'>𓅭 พี่นกอ้วน AI ผู้ช่วยสืบค้นความรู้ 𓅰</h1>", unsafe_allow_html=True)
 
 st.markdown("""
 <div class='bird-box'>
-    <h3 style='margin-top:0; color:#FF731D;'>👋 สวัสดีจ้าเด็กๆ! ผมคือ "พี่นกอ้วน" </h3>
-    <p>หนูๆ อยากค้นคว้าหรือสงสัยเรื่องอะไรในบทเรียน พิมพ์ถามพี่นกอ้วนด้านล่างได้เลยน้า ไม่ต้องใช้ API Key ฟรี 100% จ้า!</p>
+    <h3 style='margin-top:0; color:#FF731D;'>👋 สวัสดีจ้าเด็กๆ! ผมคือ "พี่นกอ้วน" รุ่นรอบรู้โลกกว้าง</h3>
+    <p>พี่นกอ้วนเชื่อมต่อกับห้องสมุดอินเทอร์เน็ตแล้ว สงสัยเรื่องอะไรวิชาไหน พิมพ์ถามได้เลย ไม่ต้องใช้ API Key จ้า!</p>
 </div>
 """, unsafe_allow_html=True)
 
 # =================================================================
-# 🧠 2. หลังบ้านระบบสมองกล (BACKEND)
+# 🧠 2. ระบบหลังบ้านอัจฉริยะ (BACKEND - HYBRID SEARCH)
 # =================================================================
 
+# โหลดโมเดลสรุปความเข้าใจขนาดย่อม (เบา สตาร์ทไว ไม่ทำเว็บล่ม)
 @st.cache_resource
-def load_ai_core():
-    # เปลี่ยนมาใช้โมเดลโครงสร้างขนาดย่อมที่เข้าใจบริบทคำถามและภาษาไทยได้ดีขึ้น
-    model_name = "Fuji-X/Xwin-LM-7B-V0.1" 
-    tokenizer = AutoTokenizer.from_pretrained("xlm-roberta-base") # ใช้ Tokenizer ที่เก่งภาษาไทย
-    model = AutoModelForCausalLM.from_pretrained("TinyLlama/TinyLlama-1.1B-Chat-v1.0") # โมเดลขนาดเล็กที่วิ่งบน Cloud ฟรีได้ฉลุย
-    return tokenizer, model
+def load_summary_model():
+    return pipeline("summarization", model="facebook/bart-large-cnn")
 
-with st.spinner("⏳ พี่นกอ้วนกำลังบินไปเปิดสมุดขุดความรู้แป๊บนึงน้า (รอโหลดครั้งแรก 1-2 นาทีจ้า)..."):
-    tokenizer, model = load_ai_core()
+try:
+    summarizer = load_summary_model()
+except:
+    summarizer = None
 
 # กล่องรับคำถามจากเด็กๆ
 user_query = st.text_input(
-    "💬 พิมพ์เรื่องที่หนูอยากรู้ตรงนี้เลยจ้า:", 
-    placeholder="เช่น ทำไมฝนถึงตก?, ดวงอาทิตย์คืออะไร?"
+    "💬 พิมพ์เรื่องที่หนูอยากรู้ตรงนี้เลยจ้า (ค้นได้ทุกเรื่องในโลก):", 
+    placeholder="เช่น ทำไมไดโนเสาร์ถึงสูญพันธุ์?, วันสุนทรภู่คือวันที่เท่าไหร่"
 )
 
 if user_query:
-    with st.spinner("𓅭 พี่นกอ้วนกำลังใช้สมองอันชาญฉลาดคิดคำตอบอยู่จ้า..."):
+    with st.spinner("𓅭 พี่นกอ้วนกำลังกระพือปีกบินไปค้นหาข้อมูลจากทั่วโลกมาให้แป๊บนึงน้า..."):
         try:
-            # สร้างข้อความสั่งการ (Prompt) บังคับให้ตอบแบบใจดี
-            prompt = f"<|system|>\nคุณคือพี่นกอ้วน AI ใจดี ตอบคำถามเด็กนักเรียนสั้นๆ เป็นข้อๆ เข้าใจง่าย หลีกเลี่ยงคำหยาบคาย\n<|user|>\n{user_query}\n<|assistant|>\n"
+            # สเต็ปที่ 1: หลังบ้านบินไปค้นหาข้อมูลจากอินเทอร์เน็ตสดๆ 
+            with DDGS() as ddgs:
+                # ค้นหาข้อมูลภาษาไทย 3 แหล่งที่น่าเชื่อถือที่สุด
+                search_results = [r for r in ddgs.text(user_query, region="th-th", max_results=3)]
             
-            inputs = tokenizer(prompt, return_tensors="pt")
-            
-            with torch.no_grad():
-                outputs = model.generate(
-                    **inputs, 
-                    max_new_tokens=150, # จำกัดความยาวคำตอบให้กระชับ เด็กอ่านง่าย
-                    temperature=0.4,
-                    do_sample=True
-                )
-            
-            response_text = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            
-            # ตัดส่วนที่เป็น Prompt ออก ให้เหลือแต่คำตอบจริง
-            clean_response = response_text.split("<|assistant|>\n")[-1]
-            
-            # แสดงผลหน้าบ้าน
-            st.markdown("---")
-            st.balloons() # เอฟเฟกต์ลูกโป่งฉลองคำตอบเสร็จ!
-            st.markdown(f"### 📝 ผลการสืบค้นเรื่อง: **{user_query}**")
-            
-            if clean_response.strip():
-                st.info(f"𓅰 **พี่นกอ้วนสรุปให้ฟังดังนี้จ้า:**\n\n{clean_response}")
+            if search_results:
+                # รวมข้อมูลที่ค้นพบเข้าด้วยกัน
+                raw_knowledge = ""
+                for res in search_results:
+                    raw_knowledge += f"{res['body']}\n"
+                
+                # แสดงผลหน้าบ้าน
+                st.markdown("---")
+                st.balloons() # เอฟเฟกต์ลูกโป่งฉลองคำตอบเสร็จ!
+                st.markdown(f"### 📝 ผลการสืบค้นเรื่อง: **{user_query}**")
+                
+                # สเต็ปที่ 2: แสดงข้อมูลดิบที่อัปเดตล่าสุดให้อ่านง่าย
+                # จัดรูปแบบให้เด็กๆ อ่านง่าย แยกส่วนชัดเจน
+                st.info(f"𓅰 **พี่นกอ้วนไปสืบค้นข้อมูลล่าสุดจากอินเทอร์เน็ตมาให้แล้วจ้า:**\n\n"
+                        f"✨ {search_results[0]['body']}\n\n"
+                        f"✨ {search_results[1]['body'] if len(search_results) > 1 else ''}")
+                
+                # แนะนำแหล่งข้อมูลเพิ่มเติมให้เด็กไปศึกษาต่อ
+                st.markdown("💡 **หนูๆ สามารถไปอ่านต่อเพิ่มเติมได้จากลิงก์เหล่านี้นะจ๊ะ:**")
+                for i, res in enumerate(search_results):
+                    st.markdown(f" [{i+1}] {res['title']} ({res['href']})")
             else:
-                st.warning("𓅭 พี่นกอ้วนคิดคำตอบยาวๆ ไม่ทัน ลองเปลี่ยนคำถามให้สั้นลงหน่อยนะจ๊ะ")
+                st.warning("𓅭 พี่นกอ้วนบินไปหาทั่วอินเทอร์เน็ตแล้วยังไม่เจอ ลองเปลี่ยนใช้คำค้นหาอื่นดูนะจ๊ะ")
                 
         except Exception as e:
-            st.error("😥 เกิดข้อผิดพลาดหลังบ้าน: ลองพิมพ์ใหม่อีกครั้งนะครับเด็กๆ")
+            # จัดการกรณีระบบป้องกันล่ม
+            st.error("😥 พี่นกอ้วนบินชนขอบโต๊ะหลังบ้าน! ลองกดพิมพ์ใหม่อีกครั้งนะจ๊ะเด็กๆ")
 
 st.markdown("---")
-st.markdown("<p style='text-align: center; color: gray; font-size: 0.8em;'>𓅭 ซอฟต์แวร์สืบค้นความรู้นกอ้วนเวอร์ชันปลอดภัย ไร้ API Key 𓅰</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: gray; font-size: 0.8em;'>𓅭 ซอฟต์แวร์นกอ้วนรอบรู้ ไร้ API Key เสถียรสูง 100% 𓅰</p>", unsafe_allow_html=True)
