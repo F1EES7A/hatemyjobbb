@@ -1,63 +1,69 @@
 import streamlit as st
-from google import genai
-from google.genai import types
+from transformers import pipeline
 
-# 1. ตั้งค่าหน้าตาซอฟต์แวร์ (Frontend)
+# =================================================================
+# 🎨 1. หน้าบ้าน (FRONTEND)
+# =================================================================
 st.set_page_config(
-    page_title="AI ผู้ช่วยสืบค้นข้อมูลสำหรับนักเรียน", 
-    page_icon="🎓", 
+    page_title="ครู AI ผู้ช่วยสืบค้นข้อมูลสำหรับเด็กๆ",
+    page_icon="🎓",
     layout="centered"
 )
 
-st.title("🎓 AI ผู้ช่วยสืบค้นข้อมูลสำหรับนักเรียน")
-st.write("พิมพ์เรื่องที่อยากรู้ลงไปได้เลย AI จะช่วยสรุปเนื้อหาให้เข้าใจง่าย เหมาะสำหรับการเรียนรู้ครับ")
+st.markdown("""
+    <style>
+    .main-title { color: #2E5BFF; font-family: 'Helvetica Neue', sans-serif; text-align: center; font-weight: bold; }
+    .sub-title { color: #555555; text-align: center; margin-bottom: 30px; }
+    .stTextInput>div>div>input { border-radius: 15px; }
+    </style>
+""", unsafe_allow_html=True)
 
-# ช่องใส่ API Key ป้องกันความปลอดภัย (ใส่ครั้งเดียวตอนเปิดเว็บบน Cloud)
-api_key = st.sidebar.text_input("กรุณาใส่ Google API Key:", type="password")
+st.markdown("<h1 class='main-title'>🎓 ครู AI ผู้ช่วยสืบค้นความรู้</h1>", unsafe_allow_html=True)
+st.markdown("<p class='sub-title'>ระบบซอฟต์แวร์ฟรี 100% ไม่ต้องใช้ API Key ปลอดภัยสำหรับนักเรียน ✨</p>", unsafe_allow_html=True)
 
-# 2. ส่วนควบคุมคำสั่ง AI (System Instruction)
-# ตรงนี้สำคัญมาก เป็นการตีกรอบให้ AI ทำตัวเป็นครูใจดีที่อธิบายให้เด็กฟัง
-STUDENT_PROMPT = """
-คุณคือ 'ครู AI' ผู้เชี่ยวชาญด้านการสอนและสืบค้นข้อมูลสำหรับเด็กนักเรียนวัยเรียน (ประถม-มัธยม)
-หน้าที่ของคุณคือตอบคำถามหรือสรุปข้อมูลที่นักเรียนถาม โดยมีกฎเหล็กดังนี้:
-1. ใช้ภาษาไทยที่เข้าใจง่าย หลีกเลี่ยงศัพท์เทคนิคยากๆ ถ้าจำเป็นต้องใช้ให้ใช้วิธีอธิบายเพิ่มในวงเล็บ
-2. แบ่งเนื้อหาเป็นหัวข้อสั้นๆ หรือใช้ข้อ 1, 2, 3 เพื่อให้อ่านง่าย ไม่เป็นพารากราฟยาวพรืด
-3. เนื้อหาต้องถูกต้องตามหลักวิชาการ ห้ามสร้างข้อมูลเท็จ (Hallucination)
-4. ในตอนท้าย ให้เพิ่มหัวข้อ "💡 เกร็ดความรู้เพิ่มเติม" หรือ "คำถามน่าคิด" เพื่อกระตุ้นจินตนาการเด็ก
-5. หากเป็นเรื่องที่ต้องมีการอ้างอิง ให้บอกแหล่งที่มาสั้นๆ ที่เด็กสามารถไปค้นคว้าต่อได้ (เช่น หนังสือแบบเรียน, เว็บไซต์สารานุกรม)
-"""
+# =================================================================
+# 🧠 2. หลังบ้าน (BACKEND - โหลดโมเดล AI ฟรีในตัว)
+# =================================================================
 
-# 3. การทำงานของระบบ (Backend)
-if api_key:
-    try:
-        # เชื่อมต่อระบบ Cloud ของ Gemini
-        client = genai.Client(api_key=api_key)
-        
-        # กล่องรับคำถามจากนักเรียน
-        user_query = st.text_input("🔍 หนูอยากค้นคว้าเรื่องอะไรคร้าบ/ค่ะ?", placeholder="เช่น ทำไมไดโนเสาร์ถึงสูญพันธุ์?, ฝนตกได้อย่างไร?")
+# ฟังก์ชันล็อกให้ดาวน์โหลดโมเดลแค่ครั้งเดียว ไม่โหลดซ้ำทุกครั้งที่เด็กพิมพ์
+@st.cache_resource
+def load_ai_model():
+    # ใช้โมเดลซอฟต์แวร์เปิด (Open-source) ขนาดย่อมที่รองรับภาษาไทยในการตอบคำถาม
+    return pipeline("text2text-generation", model="google/mt5-small")
 
-        if user_query:
-            with st.spinner("⏳ ครู AI กำลังไปค้นคว้าข้อมูลให้อยู่จ้า รอแป๊บน้า..."):
-                # ส่งคำสั่งไปประมวลผล
-                response = client.models.generate_content(
-                    model='gemini-2.5-flash', # โมเดลเวอร์ชันล่าสุดปี 2026 ฉลาดและเร็วมาก
-                    contents=user_query,
-                    config=types.GenerateContentConfig(
-                        system_instruction=STUDENT_PROMPT, # บังคับให้ AI เล่นบทครูใจดี
-                        temperature=0.3 # ค่าความแม่นยำ (ยิ่งต่ำ ยิ่งตอบตรงความจริง ไม่มโนเน้นวิชาการ)
-                    )
-                )
+with st.spinner("⏳ ระบบกำลังสตาร์ทสมองครู AI ครั้งแรกสุด (อาจใช้เวลา 1-2 นาทีในการตั้งค่าหลังบ้าน)..."):
+    text_generator = load_ai_model()
+
+# กล่องรับคำถามจากเด็กๆ
+user_query = st.text_input(
+    "🔍 หนูอยากค้นคว้าเรื่องอะไรวันนี้ พิมพ์บอกครูได้เลยครับ/ค่ะ:", 
+    placeholder="เช่น ประเทศไทยมีกี่จังหวัด?, ข้อมูลของดวงอาทิตย์"
+)
+
+if user_query:
+    with st.spinner("⏳ ครู AI กำลังประมวลผลคำตอบให้จ้า..."):
+        try:
+            # สั่งให้โมเดลประมวลผลข้อความไทย
+            # ส่งคำสั่งควบคุมพฤติกรรมพ่วงไปกับคำถามของเด็ก
+            prompt = f"ตอบคำถามนักเรียนด้วยภาษาที่เข้าใจง่ายและเป็นข้อๆ: {user_query}"
+            
+            # รันผลลัพธ์ผ่านตัวโมเดลซอฟต์แวร์ตรงๆ ไม่วิ่งไปผ่าน API ค่ายไหน
+            result = text_generator(prompt, max_length=200, num_return_sequences=1)
+            response_text = result[0]['generated_text']
+            
+            # แสดงผลหน้าบ้าน
+            st.markdown("---")
+            st.balloons() # เอฟเฟกต์ลูกโป่ง
+            st.markdown(f"### 📝 ผลการค้นคว้าเรื่อง: **{user_query}**")
+            
+            # กรณีโมเดลฟรีขนาดเล็กอาจจะตอบสั้น ให้มีโครงสร้างรองรับ
+            if response_text:
+                st.info(f"✨ ครู AI ขอสรุปให้น้องๆ ฟังดังนี้ครับ:\n\n{response_text}")
+            else:
+                st.warning("ครู AI คิดคำตอบนี้ไม่ทัน ลองเปลี่ยนคำถามให้กระชับขึ้นดูนะจ๊ะ")
                 
-                # แสดงผลลัพธ์บนหน้าเว็บ
-                st.markdown("---")
-                st.subheader("📝 ผลการค้นคว้า:")
-                st.write(response.text)
-                
-    except Exception as e:
-        st.error(format(e))
-else:
-    st.warning("⚠️ โปรดใส่ Google API Key ที่แถบเมนูด้านซ้าย เพื่อเปิดใช้งานระบบซอฟต์แวร์")
+        except Exception as e:
+            st.error("😥 เกิดข้อผิดพลาดในการประมวลผล ลองพิมพ์ใหม่อีกครั้งนะครับ")
 
-# ส่วนท้ายเว็บ
 st.markdown("---")
-st.caption("พัฒนาด้วย Python + Streamlit + Gemini API | ปลอดภัยสำหรับเด็ก วัยเรียนรักษ์การค้นคว้า")
+st.markdown("<p style='text-align: center; color: gray; font-size: 0.8em;'>ระบบนี้ทำงานด้วยโมเดล Open-source ภายในซอฟต์แวร์เอง ไม่พึ่งพาคีย์ภายนอก</p>", unsafe_allow_html=True)
