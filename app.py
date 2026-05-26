@@ -1,6 +1,7 @@
 import streamlit as st
 import urllib.request
 import json
+import urllib.parse
 
 # 1. ตั้งค่าหน้าตาซอฟต์แวร์ (Frontend)
 st.set_page_config(
@@ -12,67 +13,73 @@ st.set_page_config(
 st.title("สงสัยอะไรถามได้เลยนะลูก")
 st.write("พิมพ์เรื่องที่สงสัยลงไปได้เลยนะลูก")
 
-# 2. กล่องรับคำถามจากนักเรียน (Backend)
-user_query = st.text_input("🔍 อยากถามเรื่องอะไรดีลูก?", placeholder="เช่น อธิบายทฤษฎีสัมพัทธภาพ, สรุปรามเกียรติ์, สูตรคณิตศาสตร์")
+# 2. กล่องรับคำถามจากนักเรียน
+user_query = st.text_input("🔍 อยากถามเรื่องอะไรดีลูก?", placeholder="เช่น ระบบสุริยะ, วันสุนทรภู่, กฎของนิวตัน, ตรีโกณมิติ")
 
+# 3. การทำงานของระบบหลังบ้านสารานุกรมความรู้แน่น (Backend)
 if user_query:
-    with st.spinner("⏳ ฉันกำลังใช้สมองส่วนกลางสแกนความรู้ให้หนูอยู่จ้า รอแป๊บนะแม่นะ..."):
+    with st.spinner("⏳ฉันกำลังใช้สมองส่วนกลางค้นคว้าและเรียบเรียงข้อมูลแน่นๆ ให้หนูอยู่จ้า รอแป๊บแม่น้า"):
         try:
-            # เชื่อมต่อเซิร์ฟเวอร์สมองกลฟรีระดับโลก (ฉลาดระดับเดียวกับ Gemini)
-            api_url = "https://api-inference.huggingface.co/models/Qwen/Qwen2.5-7B-Instruct"
+            # คลีนข้อความและแปลงภาษาไทยให้เป็นรหัส URL 
+            clean_query = user_query.strip()
+            encoded_query = urllib.parse.quote(clean_query)
             
-            system_instruction = (
-                "คุณคือ AI ตัวแม่ผู้รอบรู้และใจดี ทำหน้าที่ตอบคำถามวิชาการให้เด็กนักเรียน "
-                "จงตอบเป็นภาษาไทยที่สุภาพ อ่านง่าย แบ่งเป็นข้อๆ ชัดเจน ข้อมูลต้องแน่น ลึกซึ้ง "
-                "และห้ามพ่นลิงก์เว็บไซต์เด็ดขาด ให้ตอบเป็นเนื้อหาความรู้ล้วนๆ"
-            )
+            # ยิงไปดึงคลังสารานุกรมวิชาการไทยโดยตรง (เสถียรที่สุด ไม่ตอบเพี้ยน)
+            wiki_url = f"https://th.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&explaintext=1&titles={encoded_query}"
             
-            payload = {
-                "inputs": f"<|im_start|>system\n{system_instruction}<|im_end|>\n<|im_start|>user\n{user_query}<|im_end|>\n<|im_start|>assistant\n",
-                "parameters": {
-                    "max_new_tokens": 600, 
-                    "temperature": 0.5,
-                    "return_full_text": False
-                }
-            }
-            
-            req = urllib.request.Request(api_url, data=json.dumps(payload).encode('utf-8'))
-            req.add_header('Content-Type', 'application/json')
+            req = urllib.request.Request(wiki_url, headers={'User-Agent': 'Mozilla/5.0'})
             
             with urllib.request.urlopen(req) as response:
-                result = json.loads(response.read().decode('utf-8'))
+                data = json.loads(response.read().decode('utf-8'))
+                pages = data.get('query', {}).get('pages', {})
                 
                 answer = ""
-                if isinstance(result, list) and len(result) > 0:
-                    answer = result[0].get('generated_text', '')
-                elif isinstance(result, dict):
-                    answer = result.get('generated_text', '')
+                for page_id, page_data in pages.items():
+                    if page_id != "-1": 
+                        answer = page_data.get('extract', '')
                 
-                if answer.strip():
+                if answer:
                     st.markdown("---")
                     st.subheader("📝 ผลการค้นคว้า:")
-                    st.info(answer.strip())
+                    
+                    # ตัดเอาเนื้อหามาแสดงแบบหนาแน่น สาระเน้นๆ ตรงคำถามชัวร์
+                    # แสดงแค่ 1,500 ตัวอักษรแรกเพื่อให้ยาวกำลังดี ดึงเฉพาะใจความสำคัญ
+                    short_answer = answer[:1500] + "..." if len(answer) > 1500 else answer
+                    
+                    st.info(f"✨ **สรุปข้อมูลเรื่อง \"{user_query}\" ให้หนูฟังอย่างละเอียดดังนี้ค่ะลูก:**\n\n{short_answer}")
                 else:
-                    st.warning("สมองกลกำลังประมวลผลคำตอบอยู่ลูก ลองกดส่งคำถามซ้ำอีกทีนะจ๊ะ")
+                    # ถ้าค้นแบบตรงตัวไม่เจอ ให้สลับไปค้นแบบคำใกล้เคียงทันทีเพื่อป้องกันเว็บค้าง
+                    search_url = f"https://th.wikipedia.org/w/api.php?action=query&list=search&srsearch={encoded_query}&format=json"
+                    req_search = urllib.request.Request(search_url, headers={'User-Agent': 'Mozilla/5.0'})
+                    
+                    with urllib.request.urlopen(req_search) as search_res:
+                        s_data = json.loads(search_res.read().decode('utf-8'))
+                        s_results = s_data.get('query', {}).get('search', [])
+                        
+                        if s_results:
+                            # ดึงหัวข้อที่ใกล้เคียงที่สุดมาค้นรอบสองอัตโนมัติ
+                            next_title = urllib.parse.quote(s_results[0]['title'])
+                            wiki_url2 = f"https://th.wikipedia.org/w/api.php?action=query&format=json&prop=extracts&explaintext=1&titles={next_title}"
+                            req2 = urllib.request.Request(wiki_url2, headers={'User-Agent': 'Mozilla/5.0'})
+                            
+                            with urllib.request.urlopen(req2) as res2:
+                                data2 = json.loads(res2.read().decode('utf-8'))
+                                pages2 = data2.get('query', {}).get('pages', {})
+                                for p_id, p_data in pages2.items():
+                                    answer2 = p_data.get('extract', '')
+                                    
+                            if answer2:
+                                st.markdown("---")
+                                st.subheader("📝 ผลการค้นคว้า:")
+                                short_answer2 = answer2[:1500] + "..." if len(answer2) > 1500 else answer2
+                                st.info(f"✨ **สรุปข้อมูลเรื่อง \"{s_results[0]['title']}\" ให้หนูฟังดังนี้ค่ะลูก:**\n\n{short_answer2}")
+                            else:
+                                st.warning("หาข้อมูลเรื่องนี้ไม่เจอเลยลูก ลองใช้คำค้นหาหลักสั้นๆ ดูนะจ๊ะ")
+                        else:
+                            st.warning("หาข้อมูลเรื่องนี้ไม่เจอเลยลูก ลองใช้คำค้นหาหลักสั้นๆ ดูนะจ๊ะ")
                     
         except Exception as e:
-            # แผนสำรองกรณีเซิร์ฟเวอร์นอกคิวยาว ดึงวิกิพีเดียไทยมาแสดงทันทีเพื่อป้องกันตัวแดง
-            try:
-                import urllib.parse
-                encoded_query = urllib.parse.quote(user_query.strip())
-                wiki_url = f"https://th.wikipedia.org/api/rest_v1/page/summary/{encoded_query}"
-                req_wiki = urllib.request.Request(wiki_url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req_wiki) as response_wiki:
-                    data_wiki = json.loads(response_wiki.read().decode('utf-8'))
-                    answer_wiki = data_wiki.get('extract', '')
-                    if answer_wiki:
-                        st.markdown("---")
-                        st.subheader("📝 ผลการค้นคว้า:")
-                        st.info(f"✨ สรุปเนื้อหาสำคัญให้หนูฟังดังนี้ค่ะลูก:\n\n{answer_wiki}")
-                    else:
-                        st.warning("เรื่องนี้ลึกซึ้งเกินไปลูก ลองใช้คำค้นหาที่สั้นและกระชับขึ้นดูนะจ๊ะ")
-            except:
-                st.warning("ระบบประมวลผลข้อมูลพร้อมกันเยอะมากเลยลูกแม่ ลองกด Enter อีกทีเพื่อกระตุ้นสมอง AI นะคะ")
+            st.warning("ระบบประมวลผลข้อมูลหนาแน่นมากลูก ลองกด Enter อีกทีเพื่อรีเฟรชข้อมูลนะลูกแม่")
 
 # ส่วนท้ายเว็บ
 st.markdown("---")
