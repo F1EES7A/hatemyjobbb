@@ -25,11 +25,10 @@ st.markdown("<p class='sub-title'>ระบบซอฟต์แวร์ฟร�
 # 🧠 2. หลังบ้าน (BACKEND - โหลดโมเดล AI ฟรีในตัว)
 # =================================================================
 
-# ฟังก์ชันล็อกให้ดาวน์โหลดโมเดลแค่ครั้งเดียว ไม่โหลดซ้ำทุกครั้งที่เด็กพิมพ์
 @st.cache_resource
 def load_ai_model():
-    # ใช้โมเดลซอฟต์แวร์เปิด (Open-source) ขนาดย่อมที่รองรับภาษาไทยในการตอบคำถาม
-    return pipeline("text2text-generation", model="google/mt5-small")
+    # เปลี่ยนระบบงานเป็น "translation" เจาะจงให้โมเดล mt5 เข้าใจภาษาไทยและประมวลผลได้ถูกต้อง
+    return pipeline("translation", model="google/mt5-small")
 
 with st.spinner("⏳ ระบบกำลังสตาร์ทสมองครู AI ครั้งแรกสุด (อาจใช้เวลา 1-2 นาทีในการตั้งค่าหลังบ้าน)..."):
     text_generator = load_ai_model()
